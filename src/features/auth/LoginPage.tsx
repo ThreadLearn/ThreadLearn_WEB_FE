@@ -14,6 +14,7 @@ import { Button, Input } from '../../components/shared';
 const schema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
+  rememberMe: z.boolean().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -28,15 +29,28 @@ export const LoginPage: React.FC = () => {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormData>({ resolver: zodResolver(schema) });
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      rememberMe: false,
+    },
+  });
 
   const onSubmit = async (data: FormData) => {
     setAuthError(null);
     setRequiresVerification(false);
 
     try {
-      const result = await authService.login(data);
-      setAuth(result.user, result.accessToken, result.refreshToken);
+      const result = await authService.login({
+        email: data.email,
+        password: data.password,
+      });
+      setAuth(
+        result.user,
+        result.accessToken,
+        result.refreshToken,
+        data.rememberMe ? 'local' : 'session'
+      );
       toast.success('Welcome back!');
       router.replace(result.user.role === 'ADMIN' ? '/admin' : '/dashboard');
     } catch (error) {
@@ -144,7 +158,16 @@ export const LoginPage: React.FC = () => {
               {...register('password')}
             />
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-xs text-gray-500 font-mono">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-white/10 bg-white/5 accent-violet-600"
+                  {...register('rememberMe')}
+                />
+                Remember me
+              </label>
+
               <Link
                 href="/forgot-password"
                 className="text-xs text-violet-400 hover:text-violet-300 font-mono transition-colors"

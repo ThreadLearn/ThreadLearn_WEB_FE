@@ -1,12 +1,15 @@
 'use client';
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { AuthTokens, AuthUser, UserStats } from '../types';
 
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
 const AUTH_STORE_KEY = 'threadlearn-auth';
+const AUTH_STORAGE_MODE_KEY = 'threadlearn-auth-storage';
+
+export type AuthStorageMode = 'local' | 'session';
 
 type StoredAuthTokens = {
   accessToken: string | null;
@@ -15,38 +18,109 @@ type StoredAuthTokens = {
 
 const canUseStorage = () => typeof window !== 'undefined';
 
+const getAuthStorageMode = (): AuthStorageMode => {
+  if (!canUseStorage()) return 'local';
+
+  if (localStorage.getItem(AUTH_STORAGE_MODE_KEY) === 'local') return 'local';
+  if (sessionStorage.getItem(AUTH_STORAGE_MODE_KEY) === 'session') return 'session';
+
+  if (
+    localStorage.getItem(ACCESS_TOKEN_KEY) ||
+    localStorage.getItem(REFRESH_TOKEN_KEY) ||
+    localStorage.getItem(AUTH_STORE_KEY)
+  ) {
+    return 'local';
+  }
+
+  if (
+    sessionStorage.getItem(ACCESS_TOKEN_KEY) ||
+    sessionStorage.getItem(REFRESH_TOKEN_KEY) ||
+    sessionStorage.getItem(AUTH_STORE_KEY)
+  ) {
+    return 'session';
+  }
+
+  return 'local';
+};
+
+const getAuthStorage = (mode: AuthStorageMode = getAuthStorageMode()) =>
+  mode === 'local' ? localStorage : sessionStorage;
+
+const clearAuthStorageFrom = (storage: Storage) => {
+  storage.removeItem(ACCESS_TOKEN_KEY);
+  storage.removeItem(REFRESH_TOKEN_KEY);
+  storage.removeItem(AUTH_STORE_KEY);
+  storage.removeItem(AUTH_STORAGE_MODE_KEY);
+};
+
+const setAuthStorageMode = (mode: AuthStorageMode) => {
+  if (!canUseStorage()) return;
+
+  const targetStorage = getAuthStorage(mode);
+  const inactiveStorage = mode === 'local' ? sessionStorage : localStorage;
+  clearAuthStorageFrom(inactiveStorage);
+  targetStorage.setItem(AUTH_STORAGE_MODE_KEY, mode);
+};
+
 export const getStoredAuthTokens = (): StoredAuthTokens => {
   if (!canUseStorage()) {
     return { accessToken: null, refreshToken: null };
   }
 
+  const localAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const localRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  if (localAccessToken || localRefreshToken) {
+    return {
+      accessToken: localAccessToken,
+      refreshToken: localRefreshToken,
+    };
+  }
+
   return {
-    accessToken: localStorage.getItem(ACCESS_TOKEN_KEY),
-    refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY),
+    accessToken: sessionStorage.getItem(ACCESS_TOKEN_KEY),
+    refreshToken: sessionStorage.getItem(REFRESH_TOKEN_KEY),
   };
 };
 
-export const persistAuthTokens = (tokens: Partial<AuthTokens>) => {
+export const persistAuthTokens = (
+  tokens: Partial<AuthTokens>,
+  mode?: AuthStorageMode
+) => {
   if (!canUseStorage()) return;
 
+  if (mode) setAuthStorageMode(mode);
+  const storage = getAuthStorage(mode);
+
   if (tokens.accessToken) {
-    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+    storage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
   }
 
   if (tokens.refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    storage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
   }
 };
 
 export const clearAuthStorage = () => {
   if (!canUseStorage()) return;
 
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem(AUTH_STORE_KEY);
-  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-  sessionStorage.removeItem(AUTH_STORE_KEY);
+  clearAuthStorageFrom(localStorage);
+  clearAuthStorageFrom(sessionStorage);
+};
+
+const authPersistStorage = {
+  getItem: (name: string) => {
+    if (!canUseStorage()) return null;
+    return localStorage.getItem(name) ?? sessionStorage.getItem(name);
+  },
+  setItem: (name: string, value: string) => {
+    if (!canUseStorage()) return;
+    getAuthStorage().setItem(name, value);
+  },
+  removeItem: (name: string) => {
+    if (!canUseStorage()) return;
+    localStorage.removeItem(name);
+    sessionStorage.removeItem(name);
+  },
 };
 
 export const sanitizeAuthUser = (user: AuthUser): AuthUser => {
@@ -87,7 +161,12 @@ interface AuthState {
   isAuthenticated: boolean;
 
   // Actions
-  setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
+  setAuth: (
+    user: AuthUser,
+    accessToken: string,
+    refreshToken: string,
+    storageMode?: AuthStorageMode
+  ) => void;
   setUser: (user: AuthUser) => void;
   setStats: (stats: UserStats) => void;
   updateAccessToken: (token: string) => void;
@@ -104,8 +183,8 @@ export const useAuthStore = create<AuthState>()(
       stats: null,
       isAuthenticated: false,
 
-      setAuth: (user, accessToken, refreshToken) => {
-        persistAuthTokens({ accessToken, refreshToken });
+      setAuth: (user, accessToken, refreshToken, storageMode = 'local') => {
+        persistAuthTokens({ accessToken, refreshToken }, storageMode);
         set({
           user: sanitizeAuthUser(user),
           accessToken,
@@ -138,6 +217,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: AUTH_STORE_KEY,
+      storage: createJSONStorage(() => authPersistStorage),
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,
