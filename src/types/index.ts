@@ -558,11 +558,15 @@ export interface PlatformStats {
 export type AdminDashboardMetricValue = string | number | boolean | null | undefined;
 
 export interface AdminDashboardSummary {
-  totalUsers?: number;
+  totalUsers: number;
   totalStudents?: number;
-  totalCourses?: number;
-  totalEnrollments?: number;
-  totalQuizAttempts?: number;
+  totalCourses: number;
+  totalEnrollments: number;
+  totalQuizAttempts: number;
+  totalRevenue: number;
+  successfulPayments: number;
+  lockedUsers: number;
+  unreadNotifications: number;
   courseCompletionRate?: number;
   quizPassRate?: number;
   [key: string]: AdminDashboardMetricValue;
@@ -591,9 +595,54 @@ export type AdminDashboardChartValue =
   | null
   | undefined;
 
-export interface AdminDashboardStatistics {
-  summary?: AdminDashboardSummary | null;
-  charts?: Record<string, AdminDashboardChartValue> | null;
+export interface UserGrowthPoint extends AdminDashboardChartPoint {
+  label: string;
+  count: number;
+}
+
+export interface RevenueTrendPoint extends AdminDashboardChartPoint {
+  label: string;
+  revenue: number;
+}
+
+export interface TopPurchasedCoursePoint extends AdminDashboardChartPoint {
+  courseId: string;
+  title: string;
+  purchases: number;
+  revenue: number;
+}
+
+export interface PaymentStatusPoint extends AdminDashboardChartPoint {
+  status: string;
+  count: number;
+}
+
+export interface UserStatusPoint extends AdminDashboardChartPoint {
+  status: string;
+  count: number;
+}
+
+export interface NotificationTypePoint extends AdminDashboardChartPoint {
+  type: string;
+  count: number;
+}
+
+export interface AdminDashboardStatisticsResponse {
+  summary: AdminDashboardSummary;
+  charts: {
+    userGrowth: UserGrowthPoint[];
+    revenueTrend: RevenueTrendPoint[];
+    topPurchasedCourses: TopPurchasedCoursePoint[];
+    paymentStatusDistribution: PaymentStatusPoint[];
+    userStatusDistribution: UserStatusPoint[];
+    notificationsByType: NotificationTypePoint[];
+  };
+}
+
+export type AdminDashboardStatistics = AdminDashboardStatisticsResponse;
+
+export interface AdminDashboardStatisticsParams {
+  months?: number;
 }
 
 // ─── API Responses ────────────────────────────────────────────────────────────

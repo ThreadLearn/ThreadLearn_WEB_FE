@@ -35,6 +35,7 @@ import type {
   AIHistoryLog,
   PlatformStats,
   AdminDashboardStatistics,
+  AdminDashboardStatisticsParams,
   Enrollment,
   UserStats,
   User,
@@ -510,6 +511,21 @@ export const aiService = {
 };
 
 // ─── Admin (UC10–UC14) ────────────────────────────────────────────────────────
+type GetDashboardStatistics = {
+  (): Promise<AdminDashboardStatistics>;
+  (params: AdminDashboardStatisticsParams): Promise<AdminDashboardStatistics>;
+};
+
+const getDashboardStatistics: GetDashboardStatistics = async (
+  { months }: AdminDashboardStatisticsParams = {}
+) => {
+  const { data } = await apiClient.get<ApiResponse<AdminDashboardStatistics>>(
+    '/admin/dashboard/statistics',
+    { params: { months } }
+  );
+  return data.data;
+};
+
 export const adminService = {
   getStats: async () => {
     const { data } = await apiClient.get<ApiResponse<PlatformStats>>(
@@ -517,12 +533,7 @@ export const adminService = {
     );
     return data.data;
   },
-  getDashboardStatistics: async () => {
-    const { data } = await apiClient.get<ApiResponse<AdminDashboardStatistics>>(
-      '/admin/dashboard/statistics'
-    );
-    return data.data;
-  },
+  getDashboardStatistics,
   listUsers: async (pageOrFilters: number | AdminStudentFilters = 1, limit = 20) => {
     const filters: AdminStudentFilters =
       typeof pageOrFilters === 'number'
