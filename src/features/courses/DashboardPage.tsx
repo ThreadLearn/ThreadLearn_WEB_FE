@@ -111,30 +111,31 @@ function DashboardCourseCard({
 export const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
   const router = useRouter();
+  const isAdmin = String(user?.role ?? '').toUpperCase() === 'ADMIN';
   const firstName = user?.name?.split(' ')[0] ?? 'learner';
 
   const { data: stats, isLoading: statsLoading, isError: statsError } = useQuery({
     queryKey: ['gamification-stats'],
     queryFn: gamificationService.getStats,
-    enabled: !!user,
+    enabled: Boolean(user) && !isAdmin,
   });
 
   const { data: enrollments, isLoading: enrollLoading, isError: enrollError } = useQuery({
     queryKey: ['my-enrollments'],
     queryFn: enrollmentsService.getMyEnrollments,
-    enabled: !!user,
+    enabled: Boolean(user) && !isAdmin,
   });
 
   const { data: resume, isLoading: resumeLoading, isError: resumeError } = useQuery({
     queryKey: ['student-resume'],
     queryFn: studentsService.getResume,
-    enabled: !!user,
+    enabled: Boolean(user) && !isAdmin,
   });
 
   const { data: myRank, isError: rankError } = useQuery({
     queryKey: ['my-rank'],
     queryFn: leaderboardService.getMyRank,
-    enabled: !!user,
+    enabled: Boolean(user) && !isAdmin,
   });
 
   const streak = stats?.currentStreak ?? stats?.streak ?? 0;
@@ -149,11 +150,27 @@ export const DashboardPage: React.FC = () => {
   const resumeCoursePath = resumeCourseId ? `/courses/${resumeCourseId}` : '/courses';
 
   useEffect(() => {
+    if (isAdmin) {
+      router.replace('/admin');
+      return;
+    }
+
     if (statsError) toast.error('Failed to load learning stats');
     if (enrollError) toast.error('Failed to load enrollments');
     if (resumeError) toast.error('Failed to load resume target');
     if (rankError) toast.error('Failed to load leaderboard rank');
-  }, [enrollError, rankError, resumeError, statsError]);
+  }, [enrollError, isAdmin, rankError, resumeError, router, statsError]);
+
+  if (isAdmin) {
+    return (
+      <DemoPageRoot>
+        <section className="rounded-lg border border-black/10 bg-white p-6">
+          <h1 className="text-2xl font-semibold text-black">Admin dashboard</h1>
+          <p className="mt-2 text-sm text-black/60">Redirecting to analytics…</p>
+        </section>
+      </DemoPageRoot>
+    );
+  }
 
   return (
     <DemoPageRoot>
