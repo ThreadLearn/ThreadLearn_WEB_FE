@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
@@ -15,10 +15,14 @@ import { adminService } from '../../services';
 import { Skeleton } from '../../components/shared';
 import type {
   AdminDashboardChartPoint,
-  AdminDashboardChartValue,
   AdminDashboardMetricValue,
   AdminDashboardSummary,
 } from '../../types';
+import {
+  AdminBarChartCard,
+  AdminLineChartCard,
+  AdminPieChartCard,
+} from './components/analytics';
 import {
   DemoDisplayTitle,
   DemoHeroWhite,
@@ -28,13 +32,7 @@ import {
   DemoWhitePanel,
 } from '../ui-reskin/demo-ui';
 
-type ChartRow = {
-  label: string;
-  value: number;
-};
-
 const labelKeys = ['label', 'name', 'date', 'month', 'type', 'status'];
-const valueKeys = ['value', 'count', 'total', 'users', 'courses', 'enrollments', 'attempts'];
 
 const toFiniteNumber = (value: AdminDashboardMetricValue): number => {
   if (typeof value === 'number') {
@@ -57,6 +55,13 @@ const formatRate = (value: AdminDashboardMetricValue): string => {
   const percentage = rate > 1 ? rate : rate * 100;
   return `${percentage.toFixed(1)}%`;
 };
+
+const formatVnd = (value: number): string =>
+  new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(value);
 
 const humanizeKey = (key: string): string =>
   key
@@ -110,41 +115,15 @@ const getChartPointLabel = (point: AdminDashboardChartPoint, index: number): str
   return firstTextValue ? String(firstTextValue) : `Item ${index + 1}`;
 };
 
-const getChartPointValue = (point: AdminDashboardChartPoint): number => {
-  for (const key of valueKeys) {
+const getChartPointValue = (point: AdminDashboardChartPoint, keys: string[]): number => {
+  for (const key of keys) {
     const value = point[key];
     if (typeof value === 'number' || typeof value === 'string') {
       return toFiniteNumber(value);
     }
   }
 
-  const firstNumericValue = Object.values(point).find((value) => {
-    if (typeof value === 'number') {
-      return Number.isFinite(value);
-    }
-
-    return typeof value === 'string' && value.trim() && Number.isFinite(Number(value));
-  });
-
-  return toFiniteNumber(firstNumericValue);
-};
-
-const normalizeChartRows = (chartValue: AdminDashboardChartValue): ChartRow[] => {
-  if (!chartValue) {
-    return [];
-  }
-
-  if (Array.isArray(chartValue)) {
-    return chartValue.map((point, index) => ({
-      label: getChartPointLabel(point, index),
-      value: getChartPointValue(point),
-    }));
-  }
-
-  return Object.entries(chartValue).map(([key, value]) => ({
-    label: humanizeKey(key),
-    value: toFiniteNumber(value),
-  }));
+  return 0;
 };
 
 const StatTile: React.FC<{
@@ -163,53 +142,8 @@ const StatTile: React.FC<{
   </div>
 );
 
-const ChartList: React.FC<{
-  title: string;
-  value: AdminDashboardChartValue;
-}> = ({ title, value }) => {
-  const rows = normalizeChartRows(value);
-  const maxValue = Math.max(...rows.map((row) => row.value), 1);
-
-  return (
-    <DemoWhitePanel>
-      <div className="p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-ink">{humanizeKey(title)}</h3>
-          <BarChart2 size={16} className="text-black/35" />
-        </div>
-
-        {rows.length === 0 ? (
-          <p className="text-sm text-black/50">No chart data yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {rows.map((row, index) => {
-              const width = `${Math.max(
-                (row.value / maxValue) * 100,
-                row.value > 0 ? 8 : 0
-              )}%`;
-
-              return (
-                <div key={`${row.label}-${index}`}>
-                  <div className="mb-1 flex items-center justify-between gap-3 text-xs">
-                    <span className="truncate text-black/60">{row.label}</span>
-                    <span className="shrink-0 font-medium text-ink">
-                      {row.value.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-[#f7f4ee]">
-                    <div className="h-full rounded-full bg-ink" style={{ width }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </DemoWhitePanel>
-  );
-};
-
 export const AdminDashboardPage: React.FC = () => {
+  const [months, setMonths] = useState(6);
   const { data: stats, isLoading, isError: statsError } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: adminService.getStats,
@@ -220,8 +154,8 @@ export const AdminDashboardPage: React.FC = () => {
     isLoading: statisticsLoading,
     isError: statisticsError,
   } = useQuery({
-    queryKey: ['admin-dashboard-statistics'],
-    queryFn: adminService.getDashboardStatistics,
+    queryKey: ['admin-dashboard-statistics', months],
+    queryFn: () => adminService.getDashboardStatistics({ months }),
   });
 
   const { data: usersData, isLoading: usersLoading } = useQuery({
@@ -237,7 +171,39 @@ export const AdminDashboardPage: React.FC = () => {
   const courseCompletionRate = stats?.courseCompletionRate ?? 0;
   const quizPassRate = stats?.quizPassRate ?? 0;
   const summaryEntries = getSummaryEntries(dashboardStatistics?.summary);
-  const chartEntries = Object.entries(dashboardStatistics?.charts ?? {});
+  const charts = dashboardStatistics?.charts;
+  const userGrowth = (charts?.userGrowth ?? []).map((point, index) => ({
+    label: getChartPointLabel(point, index),
+    count: getChartPointValue(point, ['count', 'users', 'value']),
+  }));
+  const revenueTrend = (charts?.revenueTrend ?? []).map((point, index) => ({
+    label: getChartPointLabel(point, index),
+    revenue: getChartPointValue(point, ['revenue', 'total', 'value']),
+  }));
+  const topPurchasedCourses = (charts?.topPurchasedCourses ?? []).map((point, index) => ({
+    title: typeof point.title === 'string' && point.title.trim()
+      ? point.title
+      : getChartPointLabel(point, index),
+    purchases: getChartPointValue(point, ['purchases', 'count', 'value']),
+  }));
+  const paymentStatus = (charts?.paymentStatusDistribution ?? []).map((point, index) => ({
+    status: typeof point.status === 'string' && point.status.trim()
+      ? point.status
+      : getChartPointLabel(point, index),
+    count: getChartPointValue(point, ['count', 'value']),
+  }));
+  const userStatus = (charts?.userStatusDistribution ?? []).map((point, index) => ({
+    status: typeof point.status === 'string' && point.status.trim()
+      ? point.status
+      : getChartPointLabel(point, index),
+    count: getChartPointValue(point, ['count', 'value']),
+  }));
+  const notificationsByType = (charts?.notificationsByType ?? []).map((point, index) => ({
+    type: typeof point.type === 'string' && point.type.trim()
+      ? point.type
+      : getChartPointLabel(point, index),
+    count: getChartPointValue(point, ['count', 'value']),
+  }));
 
   return (
     <DemoPageRoot>
@@ -329,31 +295,30 @@ export const AdminDashboardPage: React.FC = () => {
       </div>
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold text-ink">Charts</h2>
-        {statisticsLoading ? (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {[...Array(2)].map((_, index) => (
-              <Skeleton key={index} className="h-56 rounded-lg" />
-            ))}
-          </div>
-        ) : statisticsError ? (
-          <DemoWhitePanel>
-            <div className="flex items-center gap-2 p-5 text-sm text-amber-800">
-              <AlertCircle size={16} />
-              Dashboard charts could not be loaded.
-            </div>
-          </DemoWhitePanel>
-        ) : chartEntries.length === 0 ? (
-          <DemoWhitePanel>
-            <p className="p-6 text-sm text-black/50">No chart data yet.</p>
-          </DemoWhitePanel>
-        ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {chartEntries.map(([key, value]) => (
-              <ChartList key={key} title={key} value={value} />
-            ))}
-          </div>
-        )}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-ink">Charts</h2>
+          <label className="flex items-center gap-2 text-sm text-black/60">
+            Period
+            <select
+              aria-label="Analytics period"
+              className="rounded-md border border-black/15 bg-white px-2.5 py-1.5 text-sm text-ink"
+              value={months}
+              onChange={(event) => setMonths(Number(event.target.value))}
+            >
+              <option value={3}>3 months</option>
+              <option value={6}>6 months</option>
+              <option value={12}>12 months</option>
+            </select>
+          </label>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <AdminLineChartCard title="New Users Over Time" data={userGrowth} xKey="label" valueKey="count" valueFormatter={formatNumber} isLoading={statisticsLoading} error={statisticsError ? 'New user data could not be loaded.' : null} emptyText="No new-user data for this period." />
+          <AdminLineChartCard title="Revenue Over Time" data={revenueTrend} xKey="label" valueKey="revenue" valueFormatter={formatVnd} isLoading={statisticsLoading} error={statisticsError ? 'Revenue data could not be loaded.' : null} emptyText="No revenue data for this period." />
+          <AdminBarChartCard title="Top Purchased Courses" data={topPurchasedCourses} nameKey="title" valueKey="purchases" valueFormatter={formatNumber} isLoading={statisticsLoading} error={statisticsError ? 'Course purchase data could not be loaded.' : null} emptyText="No course purchases for this period." />
+          <AdminPieChartCard title="Payment Status Distribution" data={paymentStatus} nameKey="status" valueKey="count" valueFormatter={formatNumber} isLoading={statisticsLoading} error={statisticsError ? 'Payment status data could not be loaded.' : null} emptyText="No payment status data for this period." />
+          <AdminPieChartCard title="User Status Distribution" data={userStatus} nameKey="status" valueKey="count" valueFormatter={formatNumber} isLoading={statisticsLoading} error={statisticsError ? 'User status data could not be loaded.' : null} emptyText="No user status data for this period." />
+          <AdminBarChartCard title="Notifications By Type" data={notificationsByType} nameKey="type" valueKey="count" valueFormatter={formatNumber} isLoading={statisticsLoading} error={statisticsError ? 'Notification data could not be loaded.' : null} emptyText="No notifications for this period." />
+        </div>
       </div>
 
       <div>
