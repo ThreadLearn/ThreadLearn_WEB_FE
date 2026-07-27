@@ -457,7 +457,7 @@ export const AdminStudentManagementPage: React.FC = () => {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <DemoPill tone="pink">Admin - UC10-UC13</DemoPill>
+              <DemoPill tone="pink">Admin</DemoPill>
               <Users size={18} className="text-black/45" />
             </div>
             <DemoDisplayTitle>Student management</DemoDisplayTitle>
