@@ -519,7 +519,7 @@ export interface CodeShare {
   outputTruncated?: boolean;
   runtime: string;
   memory: number;
-  visibility: 'COURSE' | 'CLASS';
+  visibility: 'COURSE';
   createdAt: string;
 }
 

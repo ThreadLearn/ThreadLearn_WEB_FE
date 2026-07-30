@@ -48,7 +48,7 @@ function CodeSharePreview({
   });
   const [expanded, setExpanded] = useState(false);
   const { mutate: saveNote, isPending: isSavingNote } = useMutation({
-    mutationFn: () => notesService.createFromCodeShare({ codeShareId, lessonId: lessonId! }),
+    mutationFn: (noteLessonId: string) => notesService.createFromCodeShare({ codeShareId, lessonId: noteLessonId }),
     onSuccess: () => toast.success('Đã lưu lời giải vào ghi chú của bài học.'),
     onError: () => toast.error('Không thể lưu lời giải vào ghi chú.'),
   });
@@ -56,6 +56,7 @@ function CodeSharePreview({
   if (isLoading) return <div className="mt-3 h-24 rounded-lg skeleton" />;
   if (isError || !share) return <p className="mt-3 text-xs text-rose-600">Đoạn code này không còn khả dụng.</p>;
 
+  const noteLessonId = lessonId ?? share.lessonId;
   const output = [share.stdout, share.stderr, share.compileOutput].filter(Boolean).join('\n');
   return (
     <div className="mt-3 overflow-hidden rounded-lg border border-black/10 bg-black text-white">
@@ -74,7 +75,7 @@ function CodeSharePreview({
           {expanded ? 'Thu gọn' : 'Xem toàn bộ'}
         </button>
         {onApplyCode ? <button type="button" onClick={() => onApplyCode(share)} className="min-h-9 rounded-md bg-[#d9f99d] px-3 text-xs font-semibold text-black hover:bg-[#bef264]">So sánh & áp dụng</button> : null}
-        {lessonId ? <button type="button" onClick={() => saveNote()} disabled={isSavingNote} className="inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-xs text-white/75 hover:bg-white/10 disabled:opacity-50"><FilePlus2 size={13} /> {isSavingNote ? 'Đang lưu...' : 'Lưu note'}</button> : null}
+        {noteLessonId ? <button type="button" onClick={() => saveNote(noteLessonId)} disabled={isSavingNote} className="inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-xs text-white/75 hover:bg-white/10 disabled:opacity-50"><FilePlus2 size={13} /> {isSavingNote ? 'Đang lưu...' : 'Lưu note'}</button> : null}
       </div>
     </div>
   );
@@ -84,7 +85,7 @@ function ReplyComposer({ comment, lessonId, onDone }: { comment: Comment; lesson
   const [content, setContent] = useState('');
   const [attachCode, setAttachCode] = useState(false);
   const [executionId, setExecutionId] = useState('');
-  const { data: history } = useQuery({ queryKey: ['code-execution-history', 'discussion'], queryFn: () => codeExecutionService.history(1, 10), enabled: attachCode });
+  const { data: history } = useQuery({ queryKey: ['code-execution-history', 'discussion', lessonId], queryFn: () => codeExecutionService.history(1, 10, lessonId), enabled: attachCode });
   const executions = history?.items ?? [];
   const { mutate: submit, isPending } = useMutation({
     mutationFn: async () => {
@@ -107,7 +108,7 @@ function ReplyComposer({ comment, lessonId, onDone }: { comment: Comment; lesson
       {executions.map((execution: CodeExecutionResult) => <option key={execution._id} value={execution._id}>{execution.language} · {execution.status.description} · {new Date(execution.createdAt).toLocaleString()}</option>)}
     </select> : null}
     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-      {lessonId ? <label className="inline-flex min-h-9 items-center gap-2 text-xs text-black/60"><input type="checkbox" checked={attachCode} onChange={(event) => setAttachCode(event.target.checked)} /> Đính kèm lần chạy đã xác thực</label> : <span />}
+      <label className="inline-flex min-h-9 items-center gap-2 text-xs text-black/60"><input type="checkbox" checked={attachCode} onChange={(event) => setAttachCode(event.target.checked)} /> Đính kèm lần chạy đã xác thực</label>
       <Button size="sm" onClick={() => submit()} disabled={isPending || !content.trim() || (attachCode && !executionId)} loading={isPending}><Send size={12} /> Gửi</Button>
     </div>
   </div>;
@@ -122,7 +123,7 @@ function ThreadCard({ comment, lessonId, onApplyCode }: { comment: Comment; less
   const { mutate: accept, isPending: accepting } = useMutation({ mutationFn: (replyId: string) => discussionService.accept(comment._id, replyId), onSuccess: () => { refresh(); toast.success('Đã đánh dấu lời giải được chọn.'); }, onError: () => toast.error('Không thể đánh dấu lời giải.') });
   const { mutate: close, isPending: closing } = useMutation({ mutationFn: () => discussionService.close(comment._id), onSuccess: () => { refresh(); toast.success('Đã đóng câu hỏi.'); }, onError: () => toast.error('Không thể đóng câu hỏi.') });
   const isOwner = user?._id === comment.userId;
-  const isQuestion = ['QUESTION', 'CODE_HELP', 'EXPLANATION_REQUEST'].includes(comment.postType ?? 'GENERAL');
+  const isQuestion = ['QUESTION', 'CODE_HELP', 'CODE_REVIEW', 'EXPLANATION_REQUEST'].includes(comment.postType ?? 'GENERAL');
   const authorName = comment.isAnonymous ? 'Học viên ẩn danh' : comment.user?.name || 'Thành viên ThreadLearn';
   return <article className="rounded-lg border border-black/10 bg-white p-4">
     <div className="flex gap-3"><Avatar src={comment.isAnonymous ? undefined : comment.user?.avatarUrl} name={authorName} size="sm" /><div className="min-w-0 flex-1">
@@ -149,7 +150,7 @@ export const ContextualDiscussionRoom: React.FC<Props> = ({ targetType, targetId
   const activeSocketRef = useRef<import('socket.io-client').Socket | null>(null);
   const socketHandlerRef = useRef<((event: { targetType: TargetType; targetId: string }) => void) | null>(null);
   const { data, isLoading, isError } = useQuery({ queryKey: [...queryKey(targetType, targetId), filterType, filterStatus], queryFn: () => discussionService.list(targetType, targetId, 1, 20, { ...(filterType ? { postType: filterType } : {}), ...(filterStatus ? { questionStatus: filterStatus } : {}) }), enabled: Boolean(targetId) });
-  const { data: history } = useQuery({ queryKey: ['code-execution-history', 'discussion-root'], queryFn: () => codeExecutionService.history(1, 10), enabled: attachCode && Boolean(lessonId) });
+  const { data: history } = useQuery({ queryKey: ['code-execution-history', 'discussion-root', lessonId], queryFn: () => codeExecutionService.history(1, 10, lessonId), enabled: attachCode });
   const executions = history?.items ?? [];
   const threads = useMemo(() => data?.items ?? [], [data]);
   useEffect(() => {
@@ -166,12 +167,18 @@ export const ContextualDiscussionRoom: React.FC<Props> = ({ targetType, targetId
       };
       socketHandlerRef.current = handler;
       socket.on('discussion:update', handler);
-      socket.emit('discussion:join', { targetType, targetId });
+      const joinRoom = () => socket.emit('discussion:join', { targetType, targetId });
+      socket.on('connect', joinRoom);
+      joinRoom();
+      (socketHandlerRef.current as typeof handler & { joinRoom?: () => void }).joinRoom = joinRoom;
     });
     return () => {
       if (activeSocketRef.current) {
         activeSocketRef.current.emit('discussion:leave', { targetType, targetId });
-        if (socketHandlerRef.current) activeSocketRef.current.off('discussion:update', socketHandlerRef.current);
+        if (socketHandlerRef.current) {
+          activeSocketRef.current.off('discussion:update', socketHandlerRef.current);
+          activeSocketRef.current.off('connect', (socketHandlerRef.current as { joinRoom?: () => void }).joinRoom);
+        }
       }
       unsubscribe();
     };
@@ -190,7 +197,7 @@ export const ContextualDiscussionRoom: React.FC<Props> = ({ targetType, targetId
     <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><MessageSquare size={17} /><h2 className="font-semibold text-ink">Phòng thảo luận</h2></div><span className="text-xs text-black/45">{threads.length} chủ đề</span></div>
     <div className="flex flex-wrap gap-2"><select aria-label="Lọc loại thảo luận" value={filterType} onChange={(event) => setFilterType(event.target.value as RootPostType | '')} className="min-h-9 rounded-md border border-black/10 bg-white px-2 text-xs"><option value="">Tất cả loại</option>{Object.entries(postLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select aria-label="Lọc trạng thái câu hỏi" value={filterStatus} onChange={(event) => setFilterStatus(event.target.value as NonNullable<Comment['questionStatus']> | '')} className="min-h-9 rounded-md border border-black/10 bg-white px-2 text-xs"><option value="">Mọi trạng thái</option><option value="OPEN">Đang mở</option><option value="SOLVED">Đã giải</option><option value="CLOSED">Đã đóng</option></select></div>
     <p className="text-sm leading-6 text-ink-faint">Hỏi đúng bài học, phản hồi bằng lần chạy code đã xác thực và chỉ áp dụng khi bạn đã xem so sánh.</p>
-    <div className="rounded-lg border border-black/10 bg-black/[0.025] p-3"><div className="mb-2 flex flex-wrap gap-2"><select value={postType} onChange={(event) => setPostType(event.target.value as RootPostType)} className="min-h-10 rounded-md border border-black/15 bg-white px-2 text-xs">{Object.entries(postLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><label className="inline-flex min-h-10 items-center gap-2 text-xs text-black/60"><input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} /> Ẩn danh</label></div><textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={2000} rows={3} placeholder="Nêu rõ điều bạn đang vướng, đoạn kiến thức hoặc kết quả mong đợi..." className="w-full resize-y rounded-md border border-black/10 bg-white p-3 text-sm outline-none focus:border-black/35" />{lessonId ? <><label className="mt-2 inline-flex min-h-9 items-center gap-2 text-xs text-black/60"><input type="checkbox" checked={attachCode} onChange={(event) => setAttachCode(event.target.checked)} /> Đính kèm lần chạy code đã xác thực</label>{attachCode ? <select value={executionId} onChange={(event) => setExecutionId(event.target.value)} className="mt-2 min-h-10 w-full rounded-md border border-black/15 bg-white px-2 text-xs"><option value="">Chọn lần chạy code của bạn</option>{executions.map((execution: CodeExecutionResult) => <option key={execution._id} value={execution._id}>{execution.language} · {execution.status.description} · {new Date(execution.createdAt).toLocaleString()}</option>)}</select> : null}</> : null}<div className="mt-2 flex justify-end"><Button size="sm" onClick={() => create()} disabled={isPending || !content.trim() || (attachCode && !executionId)} loading={isPending}><Send size={12} /> Đăng thảo luận</Button></div></div>
+    <div className="rounded-lg border border-black/10 bg-black/[0.025] p-3"><div className="mb-2 flex flex-wrap gap-2"><select value={postType} onChange={(event) => setPostType(event.target.value as RootPostType)} className="min-h-10 rounded-md border border-black/15 bg-white px-2 text-xs">{Object.entries(postLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><label className="inline-flex min-h-10 items-center gap-2 text-xs text-black/60"><input type="checkbox" checked={anonymous} disabled={attachCode} onChange={(event) => setAnonymous(event.target.checked)} /> Ẩn danh</label></div><textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={2000} rows={3} placeholder="Nêu rõ điều bạn đang vướng, đoạn kiến thức hoặc kết quả mong đợi..." className="w-full resize-y rounded-md border border-black/10 bg-white p-3 text-sm outline-none focus:border-black/35" /><><label className="mt-2 inline-flex min-h-9 items-center gap-2 text-xs text-black/60"><input type="checkbox" checked={attachCode} onChange={(event) => { setAttachCode(event.target.checked); if (event.target.checked) setAnonymous(false); }} /> Đính kèm lần chạy code đã xác thực</label>{attachCode ? <select value={executionId} onChange={(event) => setExecutionId(event.target.value)} className="mt-2 min-h-10 w-full rounded-md border border-black/15 bg-white px-2 text-xs"><option value="">Chọn lần chạy code của bạn</option>{executions.map((execution: CodeExecutionResult) => <option key={execution._id} value={execution._id}>{execution.language} · {execution.status.description} · {new Date(execution.createdAt).toLocaleString()}</option>)}</select> : null}</><div className="mt-2 flex justify-end"><Button size="sm" onClick={() => create()} disabled={isPending || !content.trim() || (attachCode && !executionId)} loading={isPending}><Send size={12} /> Đăng thảo luận</Button></div></div>
     {isLoading ? <div className="space-y-3"><div className="h-32 rounded-lg skeleton" /><div className="h-32 rounded-lg skeleton" /></div> : isError ? <p className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Không thể tải phòng thảo luận. Hãy kiểm tra quyền truy cập bài học.</p> : threads.length ? <div className="space-y-3">{threads.map((comment) => <ThreadCard key={comment._id} comment={comment} lessonId={lessonId} onApplyCode={onApplyCode} />)}</div> : <p className="rounded-lg border border-dashed border-black/15 p-5 text-center text-sm text-black/50">Chưa có chủ đề. Hãy mở đầu bằng một câu hỏi cụ thể.</p>}
   </section>;
 };

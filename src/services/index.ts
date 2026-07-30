@@ -410,7 +410,7 @@ export const discussionService = {
 };
 
 export const codeShareService = {
-  createFromExecution: async (payload: { sourceExecutionId: string; targetType: 'COURSE' | 'LESSON'; targetId: string; visibility?: 'COURSE' | 'CLASS' }) => {
+  createFromExecution: async (payload: { sourceExecutionId: string; targetType: 'COURSE' | 'LESSON'; targetId: string; visibility?: 'COURSE' }) => {
     const { data } = await apiClient.post<ApiResponse<CodeShare>>('/code-shares/from-execution', payload);
     return data.data;
   },
@@ -500,8 +500,8 @@ export const codeExecutionService = {
     const { data } = await apiClient.post<ApiResponse<CodeExecutionResult>>('/code-execution/run', payload);
     return data.data;
   },
-  history: async (page = 1, limit = 20) => {
-    const { data } = await apiClient.get<ApiResponse<import('../types').HistoryPage<CodeExecutionResult>>>('/code-execution/history', { params: { page, limit } });
+  history: async (page = 1, limit = 20, lessonId?: string, exerciseId?: string) => {
+    const { data } = await apiClient.get<ApiResponse<import('../types').HistoryPage<CodeExecutionResult>>>('/code-execution/history', { params: { page, limit, lessonId, exerciseId } });
     return data.data;
   },
   detail: async (id: string) => {

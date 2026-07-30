@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -67,6 +67,7 @@ function LessonCodeRunner({
   lessonId,
   courseId,
   language,
+  exerciseId,
   initialCode,
   userId,
   requestedShare,
@@ -76,17 +77,19 @@ function LessonCodeRunner({
   lessonId: string;
   courseId: string;
   language: string;
+  exerciseId: string;
   initialCode: string;
   userId?: string;
   requestedShare?: CodeShare | null;
   onApplyHandled?: () => void;
   onReviewed?: () => void;
 }) {
-  const draftKey = `threadlearn:lesson-draft:${userId ?? 'anonymous'}:${lessonId}:default`;
+  const draftKey = `threadlearn:lesson-draft:${userId ?? 'anonymous'}:${lessonId}:${exerciseId}`;
   const [code, setCode] = useState(initialCode);
   const [result, setResult] = useState<CodeExecutionResult | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [compareShare, setCompareShare] = useState<CodeShare | null>(null);
+  const comparisonDialogRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(draftKey);
@@ -101,6 +104,19 @@ function LessonCodeRunner({
     if (requestedShare) setCompareShare(requestedShare);
   }, [requestedShare]);
 
+  useEffect(() => {
+    if (!compareShare) return;
+    comparisonDialogRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setCompareShare(null);
+        onApplyHandled?.();
+      }
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [compareShare, onApplyHandled]);
+
   const { mutate: runCode, isPending } = useMutation({
     mutationFn: () =>
       codeExecutionService.run({
@@ -108,6 +124,7 @@ function LessonCodeRunner({
         language: normalizeRunnableLanguage(language),
         lessonId,
         courseId,
+        exerciseId,
       }),
     onSuccess: (execution) => {
       setResult(execution);
@@ -210,7 +227,7 @@ function LessonCodeRunner({
       {compareShare ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button type="button" aria-label="Close code comparison" onClick={() => { setCompareShare(null); onApplyHandled?.(); }} className="absolute inset-0 bg-black/40" />
-          <div className="relative max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl border border-black/10 bg-white p-5 shadow-2xl">
+          <div ref={comparisonDialogRef} role="dialog" aria-modal="true" aria-label="So sánh trước khi áp dụng mã" tabIndex={-1} className="relative max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl border border-black/10 bg-white p-5 shadow-2xl outline-none">
             <div className="flex items-start justify-between gap-4">
               <div><h3 className="text-lg font-semibold text-ink">So sánh trước khi áp dụng</h3><p className="mt-1 text-sm text-ink-faint">Mã của bạn chỉ thay đổi sau khi xác nhận. Việc áp dụng không tự chạy hoặc tự nộp bài.</p></div>
               <button type="button" onClick={() => { setCompareShare(null); onApplyHandled?.(); }} className="rounded-md px-2 py-1 text-sm hover:bg-black/[0.05]">Đóng</button>
@@ -551,6 +568,7 @@ export const LessonPage: React.FC = () => {
                   lessonId={id!}
                   courseId={lesson.courseId}
                   language={runnableSnippet.language}
+                  exerciseId={`snippet-${lesson.codeSnippets?.indexOf(runnableSnippet) ?? 0}`}
                   initialCode={runnableSnippet.code}
                   userId={user?._id}
                   requestedShare={requestedShare}
