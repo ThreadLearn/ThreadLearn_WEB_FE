@@ -31,7 +31,9 @@ const publishSocket = (socket: Socket | null) => {
 export const subscribeRealtimeSocket = (subscriber: (socket: Socket | null) => void) => {
   socketSubscribers.add(subscriber);
   subscriber(activeSocket);
-  return () => socketSubscribers.delete(subscriber);
+  return () => {
+    socketSubscribers.delete(subscriber);
+  };
 };
 
 /**

@@ -446,11 +446,16 @@ export interface Comment {
   editedAt?: string;
   likes: string[];
   reactionCount?: number;
+  helpfulCount?: number;
+  replyCount?: number;
   mentionUserIds?: string[];
   postType?: 'GENERAL' | 'QUESTION' | 'CODE_HELP' | 'CODE_REVIEW' | 'EXPLANATION_REQUEST' | 'CODE_SOLUTION';
   questionStatus?: 'OPEN' | 'SOLVED' | 'CLOSED';
   codeShareId?: string;
   acceptedReplyId?: string;
+  learningContext?: { expectedResult?: string; actualResult?: string; tried?: string };
+  instructorVerifiedAt?: string;
+  instructorVerifiedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -511,7 +516,7 @@ export interface CodeShare {
   lessonId?: string;
   exerciseId?: string;
   language: string;
-  sourceCode: string;
+  sourceCode?: string;
   status: string;
   stdout: string;
   stderr: string;
@@ -521,6 +526,9 @@ export interface CodeShare {
   memory: number;
   visibility: 'COURSE';
   createdAt: string;
+  lesson?: { _id: string; title: string; courseId: string };
+  isOutdated?: boolean;
+  isCodeLocked?: boolean;
 }
 
 export interface CodeExecutionResult {

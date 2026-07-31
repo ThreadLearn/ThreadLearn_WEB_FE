@@ -232,8 +232,8 @@ function LessonCodeRunner({
               <div><h3 className="text-lg font-semibold text-ink">So sánh trước khi áp dụng</h3><p className="mt-1 text-sm text-ink-faint">Mã của bạn chỉ thay đổi sau khi xác nhận. Việc áp dụng không tự chạy hoặc tự nộp bài.</p></div>
               <button type="button" onClick={() => { setCompareShare(null); onApplyHandled?.(); }} className="rounded-md px-2 py-1 text-sm hover:bg-black/[0.05]">Đóng</button>
             </div>
-            <div className="mt-4 max-h-[54vh] overflow-auto rounded-lg border border-black/10"><CodeDiffView oldCode={code} newCode={compareShare.sourceCode} /></div>
-            <div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => { setCompareShare(null); onApplyHandled?.(); }}>Hủy</Button><Button onClick={() => { setCode(compareShare.sourceCode); setResult(null); setRunError(null); setCompareShare(null); onApplyHandled?.(); toast.success('Đã áp dụng vào bản nháp cục bộ.'); }}>Xác nhận áp dụng</Button></div>
+            <div className="mt-4 max-h-[54vh] overflow-auto rounded-lg border border-black/10"><CodeDiffView oldCode={code} newCode={compareShare.sourceCode ?? code} /></div>
+            <div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => { setCompareShare(null); onApplyHandled?.(); }}>Hủy</Button><Button disabled={!compareShare.sourceCode} onClick={() => { if (!compareShare.sourceCode) return; setCode(compareShare.sourceCode); setResult(null); setRunError(null); setCompareShare(null); onApplyHandled?.(); toast.success('Đã áp dụng vào bản nháp cục bộ.'); }}>Xác nhận áp dụng</Button></div>
           </div>
         </div>
       ) : null}
@@ -633,7 +633,7 @@ export const LessonPage: React.FC = () => {
               {activePanel === 'notes' ? (
                 <NotesPanel lessonId={id!} selection={selectedNoteAnchor} />
               ) : (
-                <CommentsSection lessonId={id!} onApplyCode={setRequestedShare} />
+                <CommentsSection lessonId={id!} onApplyCode={(share) => share.sourceCode ? setRequestedShare(share) : toast.error('Hãy tự chạy bài tập trước khi áp dụng lời giải.')} />
               )}
             </div>
           </article>
@@ -792,7 +792,7 @@ export const LessonPage: React.FC = () => {
             </div>
 
             <div className="hidden rounded-lg border border-black/10 bg-white p-5 xl:block">
-              <CommentsSection lessonId={id!} onApplyCode={setRequestedShare} />
+              <CommentsSection lessonId={id!} onApplyCode={(share) => share.sourceCode ? setRequestedShare(share) : toast.error('Hãy tự chạy bài tập trước khi áp dụng lời giải.')} />
             </div>
           </aside>
         </div>

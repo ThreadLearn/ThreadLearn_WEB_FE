@@ -381,6 +381,7 @@ export const discussionService = {
   create: async (payload: {
     targetType: 'COURSE' | 'LESSON'; targetId: string; content: string; isAnonymous?: boolean;
     postType?: Comment['postType']; codeShareId?: string;
+    learningContext?: { expectedResult: string; actualResult: string; tried: string };
   }) => {
     const { data } = await apiClient.post<ApiResponse<Comment>>('/comments', payload);
     return data.data;
@@ -405,6 +406,22 @@ export const discussionService = {
   },
   reopen: async (commentId: string) => {
     const { data } = await apiClient.patch<ApiResponse<Comment>>(`/comments/${commentId}/reopen`);
+    return data.data;
+  },
+  toggleHelpful: async (commentId: string) => {
+    const { data } = await apiClient.put<ApiResponse<{ helpful: boolean; comment: Comment }>>(`/comments/${commentId}/helpful`);
+    return data.data;
+  },
+  report: async (commentId: string, payload: { reason: 'SPAM' | 'ABUSE' | 'INCORRECT' | 'SPOILER' | 'UNSAFE_CODE' | 'OTHER'; details?: string }) => {
+    const { data } = await apiClient.post<ApiResponse<{ _id: string; status: string }>>(`/comments/${commentId}/reports`, payload);
+    return data.data;
+  },
+  verify: async (commentId: string) => {
+    const { data } = await apiClient.patch<ApiResponse<Comment>>(`/comments/${commentId}/verify`);
+    return data.data;
+  },
+  moderate: async (commentId: string, payload: { action: 'HIDE' | 'RESTORE'; reason: string }) => {
+    const { data } = await apiClient.patch<ApiResponse<Comment>>(`/comments/${commentId}/moderation`, payload);
     return data.data;
   },
 };
