@@ -48,14 +48,14 @@ describe('instructorCodeAssignmentsService facade', () => {
   });
 
   describe('strict allowlisted mutations', () => {
-    it('creates exercise for existing coding lesson with DRAFT status and strict allowlist', async () => {
+    it('creates exercise for existing lesson with strict allowlist and omits status field', async () => {
       vi.mocked(apiClient.post).mockResolvedValueOnce({
         data: {
           data: { id: 'ex-new', lessonId: 'les-456', title: 'New Ex', language: 'javascript', status: 'DRAFT' },
         },
       } as any);
 
-      await instructorCodeAssignmentsService.createForExistingCodingLesson({
+      await instructorCodeAssignmentsService.createForExistingLesson({
         lessonId: 'les-456',
         title: 'New Ex',
         language: 'javascript',
@@ -68,10 +68,34 @@ describe('instructorCodeAssignmentsService facade', () => {
         lessonId: 'les-456',
         title: 'New Ex',
         language: 'javascript',
-        status: 'DRAFT',
         starterCode: 'function main() {}',
         timeLimitMs: 2000,
         memoryLimitKb: 131072,
+      });
+
+      const sentBody = vi.mocked(apiClient.post).mock.calls[0]?.[1] as any;
+      expect(sentBody.status).toBeUndefined();
+      expect(sentBody.lessonId).toBe('les-456');
+    });
+
+    it('supports createForExistingCodingLesson backward compatible alias', async () => {
+      vi.mocked(apiClient.post).mockResolvedValueOnce({
+        data: {
+          data: { id: 'ex-new-2', lessonId: 'les-789', title: 'Alias Ex', language: 'python' },
+        },
+      } as any);
+
+      const result = await instructorCodeAssignmentsService.createForExistingCodingLesson({
+        lessonId: 'les-789',
+        title: 'Alias Ex',
+        language: 'python',
+      });
+
+      expect(result.id).toBe('ex-new-2');
+      expect(apiClient.post).toHaveBeenCalledWith('/exercises', {
+        lessonId: 'les-789',
+        title: 'Alias Ex',
+        language: 'python',
       });
     });
 

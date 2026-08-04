@@ -78,15 +78,14 @@ export const instructorCodeAssignmentsService = {
   },
 
   /**
-   * Creates a new Coding Exercise linked to an existing persisted Coding Lesson.
-   * Forces status to DRAFT and strict allowlisted fields only.
+   * Creates a new Code Assignment linked to an existing persisted Lesson (assignment or coding).
+   * Strips status (server defaults to DRAFT) and protected fields.
    */
-  createForExistingCodingLesson: async (payload: InstructorCodeAssignmentCreatePayload): Promise<InstructorCodeAssignmentManagement> => {
+  createForExistingLesson: async (payload: InstructorCodeAssignmentCreatePayload): Promise<InstructorCodeAssignmentManagement> => {
     const body: Record<string, unknown> = {
       lessonId: payload.lessonId,
       title: payload.title.trim(),
       language: payload.language,
-      status: 'DRAFT',
     };
     if (payload.description !== undefined) body.description = payload.description;
     if (payload.starterCode !== undefined) body.starterCode = payload.starterCode;
@@ -98,6 +97,13 @@ export const instructorCodeAssignmentsService = {
 
     const { data } = await apiClient.post<ApiResponse<CodeAssignmentWire>>('/exercises', body);
     return normalizeCodeAssignment(data.data) as InstructorCodeAssignmentManagement;
+  },
+
+  /**
+   * Backward-compatible alias for createForExistingLesson.
+   */
+  createForExistingCodingLesson: async (payload: InstructorCodeAssignmentCreatePayload): Promise<InstructorCodeAssignmentManagement> => {
+    return instructorCodeAssignmentsService.createForExistingLesson(payload);
   },
 
   /**
