@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, CalendarDays, Clock3, Mail } from 'lucide-react';
+import { Bell, BrainCircuit, CalendarDays, Clock3, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button, EmptyState, Skeleton } from '../../components/shared';
 import { learningPlanService } from '../../services';
@@ -91,6 +92,13 @@ export const LearningPlanPage: React.FC = () => {
           Choose your available time and reminders. Set each completion target inside its enrolled
           course so progress is evaluated against the right course.
         </p>
+        <Link
+          href="/learning-plan/adaptive"
+          className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#102b26] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#16433a] active:translate-y-px"
+        >
+          <BrainCircuit size={16} aria-hidden="true" />
+          Open adaptive learning
+        </Link>
       </DemoHeroWhite>
 
       {isLoading ? (
