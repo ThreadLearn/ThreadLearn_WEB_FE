@@ -394,6 +394,10 @@ export interface AdaptiveDiagnosticQuestion {
 }
 
 export interface AdaptiveDiagnostic {
+  assessmentId: string;
+  source: 'GEMINI' | 'QUESTION_BANK';
+  modelName?: string;
+  expiresAt: string;
   course: {
     id: string;
     title: string;
@@ -442,6 +446,7 @@ export interface AdaptivePlanLesson {
   title: string;
   estimatedMinutes: number;
   isReview: boolean;
+  isCompleted: boolean;
 }
 
 export interface AdaptivePlanWeek {
@@ -457,6 +462,13 @@ export interface AdaptivePlanWeek {
 export interface AdaptivePlanSnapshot {
   version: number;
   diagnosticVersion: number;
+  goal: AdaptiveLearningGoal;
+  scope: 'FULL_COURSE' | 'FOCUSED';
+  coverage: {
+    selectedLessons: number;
+    totalRemainingLessons: number;
+    percentage: number;
+  };
   generatedBy: 'GEMINI' | 'RULE_ENGINE';
   modelName?: string;
   fallbackReason?: string;
@@ -470,6 +482,7 @@ export interface AdaptivePlanSnapshot {
 }
 
 export interface SubmitAdaptiveDiagnosticPayload {
+  assessmentId: string;
   goal: AdaptiveLearningGoal;
   weeklyHours: number;
   answers: Record<string, number>;

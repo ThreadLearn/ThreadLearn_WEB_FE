@@ -11,6 +11,13 @@ const course = {
 const plan: AdaptivePlanSnapshot = {
   version: 1,
   diagnosticVersion: 1,
+  goal: 'COMPLETE_COURSE',
+  scope: 'FULL_COURSE',
+  coverage: {
+    selectedLessons: 1,
+    totalRemainingLessons: 1,
+    percentage: 100,
+  },
   generatedBy: 'RULE_ENGINE',
   summary: 'A focused roadmap.',
   strengths: [],
@@ -33,6 +40,7 @@ const plan: AdaptivePlanSnapshot = {
           title: 'Event Loop fundamentals',
           estimatedMinutes: 30,
           isReview: false,
+          isCompleted: false,
         },
       ],
     },
@@ -60,6 +68,8 @@ describe('adaptive roadmap enrollment access', () => {
     render(<PlanView {...baseProps} isEnrolled={false} onEnroll={onEnroll} />);
 
     expect(screen.getByText('Recommended course')).toBeInTheDocument();
+    expect(screen.getByText('Full course roadmap')).toBeInTheDocument();
+    expect(screen.getByText('1/1')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View course' })).toHaveAttribute(
       'href',
       '/courses/course-1',
@@ -80,6 +90,23 @@ describe('adaptive roadmap enrollment access', () => {
       '/lessons/lesson-1',
     );
     expect(screen.queryByText('Locked')).toBeNull();
+  });
+
+  it('visibly marks a lesson completed from current progress', () => {
+    const completedPlan: AdaptivePlanSnapshot = {
+      ...plan,
+      weeklyPlan: [
+        {
+          ...plan.weeklyPlan[0],
+          lessons: [{ ...plan.weeklyPlan[0].lessons[0], isCompleted: true }],
+        },
+      ],
+    };
+
+    render(<PlanView {...baseProps} plan={completedPlan} isEnrolled />);
+
+    expect(screen.getByText('Completed')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Event Loop fundamentals.*Completed/i })).toBeInTheDocument();
   });
 
   it('matches enrollment records by populated course id or slug', () => {
