@@ -1130,3 +1130,14 @@ export const adminService = {
     return data;
   },
 };
+
+export {
+  instructorQuizzesService,
+  normalizeInstructorQuiz,
+  type InstructorQuizManagement,
+  type InstructorQuizUpdatePayload,
+  type InstructorQuizBankSummary,
+  type InstructorQuizBankQuestion,
+  type InstructorQuestionOption,
+  type InstructorQuestionPayload,
+} from './instructor-quiz.service';
