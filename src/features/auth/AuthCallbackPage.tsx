@@ -9,6 +9,7 @@ import { AuthShell } from './AuthShell';
 import { normalizeUser } from '../../services/auth.service';
 import { useAuthStore } from '../../store';
 import { getRoleHomePath } from '../../utils/roleNavigation';
+import { queueAdaptivePathNudge } from '../../utils/adaptive-path-nudge';
 
 type CallbackStatus = 'processing' | 'error';
 
@@ -47,6 +48,7 @@ export const AuthCallbackPage: React.FC = () => {
     try {
       const user = normalizeUser(decodeUserParam(userParam));
       setAuth(user, accessToken, refreshToken);
+      if (user.role === 'STUDENT') queueAdaptivePathNudge();
       toast.success('Welcome back!');
       // The callback lives outside the authenticated route group. A hard
       // navigation avoids a client-router transition getting stuck here while

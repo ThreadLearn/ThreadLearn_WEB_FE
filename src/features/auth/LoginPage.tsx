@@ -15,6 +15,7 @@ import { useAuthStore } from '../../store';
 import { Button, Input } from '../../components/shared';
 import { AuthShell } from './AuthShell';
 import { getPostLoginPath } from '../../utils/roleNavigation';
+import { queueAdaptivePathNudge } from '../../utils/adaptive-path-nudge';
 
 const schema = z.object({
   email: z.string().email('Invalid email address'),
@@ -68,6 +69,7 @@ export const LoginPage: React.FC = () => {
     try {
       const result = await authService.login(data);
       setAuth(result.user, result.accessToken, result.refreshToken);
+      if (result.user.role === 'STUDENT') queueAdaptivePathNudge();
       toast.success('Welcome back!');
       router.replace(getPostLoginPath(result.user.role, from));
     } catch (error) {

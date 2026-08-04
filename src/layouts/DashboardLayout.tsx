@@ -9,10 +9,11 @@ import { useAuthStore, useUIStore } from '../store';
 import { ErrorBoundary } from '../components/shared/ErrorBoundary';
 import { useSocket } from '../hooks/useSocket';
 import { useAuthBootstrap } from '../hooks';
+import { AdaptivePathNudge } from '../features/learning-plan/AdaptivePathNudge';
 
 export const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const { sidebarCollapsed } = useUIStore();
-  const { hasHydrated, isAuthenticated } = useAuthStore();
+  const { hasHydrated, isAuthenticated, user } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const isFullWidthPage = pathname?.startsWith('/ai');
@@ -47,6 +48,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
     <div className="app-shell min-h-[100dvh] text-ink">
       <Sidebar />
       <Topbar />
+      <AdaptivePathNudge role={user?.role} />
       <main
         id="main-content"
         tabIndex={-1}
