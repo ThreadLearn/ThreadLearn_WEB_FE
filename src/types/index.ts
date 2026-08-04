@@ -369,6 +369,112 @@ export interface CourseLearningGoal {
   suggestedSessionMinutes: number;
 }
 
+// ─── Adaptive learning ────────────────────────────────────────────────────────
+
+export type AdaptiveLearningGoal = 'COMPLETE_COURSE' | 'INTERVIEW_PREP' | 'BUILD_PROJECT';
+export type AdaptiveRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+export type AdaptiveSkillKey =
+  | 'RUNTIME_EVENT_LOOP'
+  | 'ASYNC_PRIMITIVES'
+  | 'RACE_SAFE_PATTERNS'
+  | 'JOB_QUEUE_CAPSTONE';
+
+export interface AdaptiveSkillDefinition {
+  key: AdaptiveSkillKey;
+  label: string;
+  description: string;
+  lessonSlugs: string[];
+}
+
+export interface AdaptiveDiagnosticQuestion {
+  id: string;
+  skillKey: AdaptiveSkillKey;
+  questionText: string;
+  options: string[];
+}
+
+export interface AdaptiveDiagnostic {
+  course: {
+    id: string;
+    title: string;
+    slug: string;
+    level?: string;
+    language?: string;
+  };
+  skills: AdaptiveSkillDefinition[];
+  questionCount: number;
+  estimatedMinutes: number;
+  questions: AdaptiveDiagnosticQuestion[];
+}
+
+export interface AdaptiveSkillScore {
+  skillKey: AdaptiveSkillKey;
+  label: string;
+  score: number;
+  confidence: number;
+  correctAnswers: number;
+  totalQuestions: number;
+}
+
+export interface AdaptiveLearningProfile {
+  id: string;
+  course: { id: string; slug: string; title: string };
+  goal: AdaptiveLearningGoal;
+  weeklyHours: number;
+  progressPercent: number;
+  overallMastery: number;
+  confidence: number;
+  riskLevel: AdaptiveRiskLevel;
+  riskSignals: string[];
+  skillScores: AdaptiveSkillScore[];
+  diagnostic: {
+    correctAnswers: number;
+    totalQuestions: number;
+    assessedAt: string;
+  };
+  version: number;
+  updatedAt: string;
+}
+
+export interface AdaptivePlanLesson {
+  lessonId: string;
+  slug: string;
+  title: string;
+  estimatedMinutes: number;
+  isReview: boolean;
+}
+
+export interface AdaptivePlanWeek {
+  week: number;
+  focusSkillKey: AdaptiveSkillKey;
+  focusLabel: string;
+  lessons: AdaptivePlanLesson[];
+  goal: string;
+  reason: string;
+  estimatedMinutes: number;
+}
+
+export interface AdaptivePlanSnapshot {
+  version: number;
+  diagnosticVersion: number;
+  generatedBy: 'GEMINI' | 'RULE_ENGINE';
+  modelName?: string;
+  fallbackReason?: string;
+  summary: string;
+  strengths: string[];
+  weaknesses: Array<{ skillKey: AdaptiveSkillKey; reason: string }>;
+  weeklyPlan: AdaptivePlanWeek[];
+  nextBestLessonId: string;
+  coachMessage: string;
+  generatedAt: string;
+}
+
+export interface SubmitAdaptiveDiagnosticPayload {
+  goal: AdaptiveLearningGoal;
+  weeklyHours: number;
+  answers: Record<string, number>;
+}
+
 // ─── Quiz ─────────────────────────────────────────────────────────────────────
 
 export interface QuizQuestion {

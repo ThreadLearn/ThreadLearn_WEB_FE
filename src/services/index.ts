@@ -378,6 +378,46 @@ export const learningPlanService = {
     );
     return data.data;
   },
+  getAdaptiveDiagnostic: async (courseSlug: string) => {
+    const { data } = await apiClient.get<ApiResponse<import('../types').AdaptiveDiagnostic>>(
+      `/learning-plan/adaptive/diagnostic/${courseSlug}`,
+    );
+    return data.data;
+  },
+  getAdaptiveProfile: async (courseSlug: string) => {
+    const { data } = await apiClient.get<
+      ApiResponse<import('../types').AdaptiveLearningProfile | null>
+    >(`/learning-plan/adaptive/me/${courseSlug}`);
+    return data.data;
+  },
+  submitAdaptiveDiagnostic: async (
+    courseSlug: string,
+    payload: import('../types').SubmitAdaptiveDiagnosticPayload,
+  ) => {
+    const { data } = await apiClient.post<ApiResponse<import('../types').AdaptiveLearningProfile>>(
+      `/learning-plan/adaptive/diagnostic/${courseSlug}`,
+      payload,
+    );
+    return data.data;
+  },
+  generateAdaptivePlan: async (courseSlug: string) => {
+    const { data } = await apiClient.post<ApiResponse<import('../types').AdaptivePlanSnapshot>>(
+      `/learning-plan/adaptive/plan/${courseSlug}`,
+    );
+    return data.data;
+  },
+  getAdaptivePlan: async (courseSlug: string) => {
+    const { data } = await apiClient.get<
+      ApiResponse<import('../types').AdaptivePlanSnapshot | null>
+    >(`/learning-plan/adaptive/plan/${courseSlug}`);
+    return data.data;
+  },
+  getAdaptivePlanHistory: async (courseSlug: string) => {
+    const { data } = await apiClient.get<ApiResponse<import('../types').AdaptivePlanSnapshot[]>>(
+      `/learning-plan/adaptive/plan/${courseSlug}/history`,
+    );
+    return data.data;
+  },
 };
 
 // ─── Quiz (UC26–UC29, UC41–UC43, UC49) ───────────────────────────────────────
