@@ -1181,3 +1181,11 @@ export {
   type InstructorQuestionOption,
   type InstructorQuestionPayload,
 } from './instructor-quiz.service';
+
+export {
+  instructorCodeAssignmentsService,
+  type InstructorCodeAssignmentManagement,
+  type InstructorCodeAssignmentUpdatePayload,
+  type InstructorCodeAssignmentCreatePayload,
+  type InstructorExerciseTestCase,
+} from './instructor-code-assignment.service';
