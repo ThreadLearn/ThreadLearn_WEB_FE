@@ -17,7 +17,7 @@ import {
   Video,
   Lock,
 } from 'lucide-react';
-import { coursesService, sectionsService, instructorLessonsService, instructorQuizzesService } from '../../services';
+import { coursesService, sectionsService, instructorLessonsService, instructorQuizzesService, instructorCodeAssignmentsService } from '../../services';
 
 function QuizLessonManageButton({ lessonId }: { lessonId: string }) {
   const { data: quiz, isLoading } = useQuery({
@@ -44,6 +44,37 @@ function QuizLessonManageButton({ lessonId }: { lessonId: string }) {
       title="Manage Quiz"
     >
       <Edit2 size={11} /> Manage Quiz
+    </Link>
+  );
+}
+
+function CodingLessonManageButton({ lessonId }: { lessonId: string }) {
+  const { data: exercises, isLoading } = useQuery({
+    queryKey: ['instructor-exercises-for-lesson', lessonId],
+    queryFn: () => instructorCodeAssignmentsService.listByLesson(lessonId),
+  });
+
+  if (isLoading) {
+    return <span className="text-[11px] text-ink-muted">Loading Exercise...</span>;
+  }
+
+  const exercise = exercises && exercises.length > 0 ? exercises[0] : null;
+
+  if (!exercise) {
+    return (
+      <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-medium" title="No exercise configured for this lesson">
+        No Exercise Configured
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={`/instructor/code-assignments/${exercise.id}/edit`}
+      className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100"
+      title="Manage Exercise"
+    >
+      <Edit2 size={11} /> Manage Exercise
     </Link>
   );
 }
@@ -200,6 +231,8 @@ function SectionLessonsList({
 
                   {les.lessonType === 'quiz' ? (
                     <QuizLessonManageButton lessonId={lesId} />
+                  ) : les.lessonType === 'coding' ? (
+                    <CodingLessonManageButton lessonId={lesId} />
                   ) : (
                     <Link
                       href={`/instructor/lessons/${lesId}/edit`}
