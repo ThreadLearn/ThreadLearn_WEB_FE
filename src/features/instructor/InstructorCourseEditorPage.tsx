@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -17,6 +18,7 @@ import {
   Video,
   Lock,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { coursesService, sectionsService, instructorLessonsService, instructorQuizzesService, instructorCodeAssignmentsService } from '../../services';
 
 function QuizLessonManageButton({ lessonId }: { lessonId: string }) {
@@ -48,43 +50,164 @@ function QuizLessonManageButton({ lessonId }: { lessonId: string }) {
   );
 }
 
-function CodingLessonManageButton({ lessonId }: { lessonId: string }) {
+function CodeAssignmentLessonManageButton({
+  lesson,
+  isCourseDraft,
+}: {
+  lesson: any;
+  isCourseDraft: boolean;
+}) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const lesId = lesson.id || lesson._id;
+  const isLocked = Boolean(lesson.isLocked || lesson.status === 'locked');
+  const [isCreating, setIsCreating] = useState(false);
+
   const { data: exercises, isLoading } = useQuery({
-    queryKey: ['instructor-exercises-for-lesson', lessonId],
-    queryFn: () => instructorCodeAssignmentsService.listByLesson(lessonId),
+    queryKey: ['instructor-exercises-for-lesson', lesId],
+    queryFn: () => instructorCodeAssignmentsService.listByLesson(lesId),
+    enabled: Boolean(lesId),
   });
 
   if (isLoading) {
-    return <span className="text-[11px] text-ink-muted">Loading Exercise...</span>;
+    return <span className="text-[11px] text-ink-muted">Loading Assignment...</span>;
   }
 
-  const exercise = exercises && exercises.length > 0 ? exercises[0] : null;
+  // E1. Lesson has exercises
+  if (exercises && exercises.length > 0) {
+    if (exercises.length === 1) {
+      const exercise = exercises[0];
+      const exId = exercise.id || exercise._id;
+      const label = lesson.lessonType === 'assignment' ? 'Manage Assignment' : 'Manage Exercise';
+      return (
+        <Link
+          href={`/instructor/code-assignments/${exId}/edit`}
+          className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100"
+          title={label}
+        >
+          <Edit2 size={11} /> {label}
+        </Link>
+      );
+    }
 
-  if (!exercise) {
+    // E1. Multiple exercises configured
     return (
-      <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-medium" title="No exercise configured for this lesson">
-        No Exercise Configured
+      <div className="flex flex-col gap-1 items-end">
+        <span
+          className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-medium border border-amber-200"
+          title="Multiple assignments configured for this lesson"
+        >
+          Multiple assignments configured
+        </span>
+        <div className="flex flex-wrap gap-1">
+          {exercises.map((ex, idx) => {
+            const exId = ex.id || ex._id || `ex-${idx}`;
+            const exTitle = ex.title ? `Manage: ${ex.title}` : `Manage Exercise #${idx + 1}`;
+            return (
+              <Link
+                key={exId}
+                href={`/instructor/code-assignments/${exId}/edit`}
+                className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100"
+                title={`Manage ${ex.title || `Exercise #${idx + 1}`}`}
+              >
+                <Edit2 size={11} /> {exTitle}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // E2. Lesson has NO exercise
+  const canConfigure = isCourseDraft && !isLocked;
+
+  if (!canConfigure) {
+    const noConfigLabel = lesson.lessonType === 'assignment' ? 'No Assignment Configured' : 'No Exercise Configured';
+    return (
+      <span
+        className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-medium"
+        title={noConfigLabel}
+      >
+        {noConfigLabel}
       </span>
     );
   }
 
+  const handleConfigure = async () => {
+    if (isCreating) return;
+    setIsCreating(true);
+
+    try {
+      // 1. Refetch exercises before POST to prevent duplicate creation
+      const refetched = await instructorCodeAssignmentsService.listByLesson(lesId);
+      if (refetched && refetched.length > 0) {
+        queryClient.setQueryData(['instructor-exercises-for-lesson', lesId], refetched);
+        const existingEx = refetched[0];
+        const existingId = existingEx?.id || existingEx?._id;
+        if (existingId) {
+          router.push(`/instructor/code-assignments/${existingId}/edit`);
+        }
+        setIsCreating(false);
+        return;
+      }
+
+      // 2. Create new exercise with strict allowlist (no status field)
+      const created = await instructorCodeAssignmentsService.createForExistingLesson({
+        lessonId: lesId,
+        title: lesson.title || 'Untitled Assignment',
+        language: 'javascript',
+      });
+
+      const createdId = created?.id || created?._id;
+      if (!createdId) {
+        toast.error('Failed to resolve created exercise ID.');
+        setIsCreating(false);
+        return;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['instructor-exercises-for-lesson', lesId] });
+      router.push(`/instructor/code-assignments/${createdId}/edit`);
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || 'Failed to configure assignment.';
+      toast.error(message);
+      setIsCreating(false);
+    }
+  };
+
+  const btnLabel = lesson.lessonType === 'assignment' ? 'Configure Assignment' : 'Configure Exercise';
+
   return (
-    <Link
-      href={`/instructor/code-assignments/${exercise.id}/edit`}
-      className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100"
-      title="Manage Exercise"
+    <button
+      type="button"
+      disabled={isCreating}
+      onClick={handleConfigure}
+      className="inline-flex items-center gap-1 rounded bg-[#d9f99d] border border-black/10 px-2 py-0.5 text-[11px] font-semibold text-black hover:bg-[#bef264] disabled:opacity-50"
+      title={btnLabel}
     >
-      <Edit2 size={11} /> Manage Exercise
-    </Link>
+      <Plus size={11} />
+      {isCreating ? 'Configuring...' : btnLabel}
+    </button>
+  );
+}
+
+function CodingLessonManageButton({ lessonId }: { lessonId: string }) {
+  return (
+    <CodeAssignmentLessonManageButton
+      lesson={{ id: lessonId, _id: lessonId, lessonType: 'coding' }}
+      isCourseDraft={true}
+    />
   );
 }
 
 function SectionLessonsList({
   sectionId,
   isCoursePublished,
+  isCourseDraft = true,
 }: {
   sectionId: string;
   isCoursePublished: boolean;
+  isCourseDraft?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -231,8 +354,8 @@ function SectionLessonsList({
 
                   {les.lessonType === 'quiz' ? (
                     <QuizLessonManageButton lessonId={lesId} />
-                  ) : les.lessonType === 'coding' ? (
-                    <CodingLessonManageButton lessonId={lesId} />
+                  ) : les.lessonType === 'coding' || les.lessonType === 'assignment' ? (
+                    <CodeAssignmentLessonManageButton lesson={les} isCourseDraft={isCourseDraft} />
                   ) : (
                     <Link
                       href={`/instructor/lessons/${lesId}/edit`}
@@ -353,8 +476,9 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
     enabled: !!courseId,
   });
 
-  const course = courseQuery.data?.course;
-  const isCoursePublished = course?.status === 'published';
+  const course = (courseQuery.data as any)?.course || courseQuery.data;
+  const isCoursePublished = (course as any)?.status === 'published' || (course as any)?.status === 'hidden' || (course as any)?.status === 'archived';
+  const isCourseDraft = (course as any)?.status === 'draft';
 
   // Local course form state
   const [formData, setFormData] = useState<{
@@ -785,7 +909,7 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
                     {sec.description ? <p className="mt-1 text-xs text-ink-muted">{sec.description}</p> : null}
 
                     {/* Render Section Lessons list */}
-                    <SectionLessonsList sectionId={secId} isCoursePublished={Boolean(isCoursePublished)} />
+                    <SectionLessonsList sectionId={secId} isCoursePublished={Boolean(isCoursePublished)} isCourseDraft={Boolean(isCourseDraft)} />
                   </div>
                 );
               })}
