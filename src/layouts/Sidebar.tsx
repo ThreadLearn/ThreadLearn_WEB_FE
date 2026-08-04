@@ -25,6 +25,7 @@ import {
   Award,
   CalendarDays,
   GraduationCap,
+  BrainCircuit,
 } from 'lucide-react';
 import { useAuthStore, useUIStore } from '../store';
 import { getDisplayName } from '../utils';
@@ -58,7 +59,17 @@ interface NavGroup {
 const studentNavItems: NavItem[] = [
   { to: '/dashboard', icon: <LayoutDashboard size={16} />, label: 'Dashboard' },
   { to: '/courses', icon: <BookOpen size={16} />, label: 'Courses' },
-  { to: '/learning-plan', icon: <CalendarDays size={16} />, label: 'Study plan' },
+  {
+    to: '/learning-plan',
+    icon: <CalendarDays size={16} />,
+    label: 'Study plan',
+    isActive: (pathname) => pathname === '/learning-plan',
+  },
+  {
+    to: '/learning-plan/adaptive',
+    icon: <BrainCircuit size={16} />,
+    label: 'Adaptive path',
+  },
   { to: '/ide', icon: <Code2 size={16} />, label: 'Code Lab' },
   {
     to: '/quiz/history',
