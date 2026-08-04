@@ -20,6 +20,7 @@ describe('learningPlanService adaptive learning API', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: { data: {} } });
     vi.mocked(apiClient.post).mockResolvedValue({ data: { data: {} } });
     const payload = {
+      assessmentId: '64b000000000000000000001',
       goal: 'INTERVIEW_PREP' as const,
       weeklyHours: 4,
       answers: { 'quiz:0': 2 },
@@ -34,7 +35,8 @@ describe('learningPlanService adaptive learning API', () => {
 
     expect(apiClient.get).toHaveBeenNthCalledWith(
       1,
-      '/learning-plan/adaptive/diagnostic/course-slug'
+      '/learning-plan/adaptive/diagnostic/course-slug',
+      { timeout: 15_000 },
     );
     expect(apiClient.get).toHaveBeenNthCalledWith(
       2,

@@ -381,6 +381,7 @@ export const learningPlanService = {
   getAdaptiveDiagnostic: async (courseSlug: string) => {
     const { data } = await apiClient.get<ApiResponse<import('../types').AdaptiveDiagnostic>>(
       `/learning-plan/adaptive/diagnostic/${courseSlug}`,
+      { timeout: 15_000 },
     );
     return data.data;
   },
