@@ -2,9 +2,260 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Save, Plus, Trash2, ArrowUp, ArrowDown, Upload, Layers, Edit2 } from 'lucide-react';
-import { coursesService, sectionsService } from '../../services';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowLeft,
+  Save,
+  Plus,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+  Upload,
+  Layers,
+  Edit2,
+  FileText,
+  Video,
+  Lock,
+} from 'lucide-react';
+import { coursesService, sectionsService, instructorLessonsService } from '../../services';
+
+function SectionLessonsList({
+  sectionId,
+  isCoursePublished,
+}: {
+  sectionId: string;
+  isCoursePublished: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [lessonTitle, setLessonTitle] = useState('');
+  const [lessonType, setLessonType] = useState<'article' | 'video'>('article');
+  const [creating, setCreating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const lessonsQuery = useQuery({
+    queryKey: ['instructor-section-lessons', sectionId],
+    queryFn: () => instructorLessonsService.listBySection(sectionId),
+    enabled: !!sectionId,
+  });
+
+  const lessons = lessonsQuery.data || [];
+
+  const handleCreateLesson = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lessonTitle.trim()) return;
+
+    setCreating(true);
+    setErrorMsg(null);
+
+    try {
+      await instructorLessonsService.create(sectionId, {
+        title: lessonTitle,
+        lessonType,
+      });
+
+      setCreateModalOpen(false);
+      setLessonTitle('');
+      queryClient.invalidateQueries({ queryKey: ['instructor-section-lessons', sectionId] });
+    } catch (err: any) {
+      setErrorMsg(err?.response?.data?.message || err?.message || 'Failed to create lesson.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteLesson = async (lessonId: string) => {
+    if (!confirm('Are you sure you want to delete this lesson?')) return;
+
+    try {
+      await instructorLessonsService.delete(lessonId);
+      queryClient.invalidateQueries({ queryKey: ['instructor-section-lessons', sectionId] });
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Failed to delete lesson.');
+    }
+  };
+
+  const handleMoveLesson = async (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= lessons.length) return;
+
+    const newList = [...lessons];
+    const temp = newList[index];
+    newList[index] = newList[targetIndex];
+    newList[targetIndex] = temp;
+
+    const orderedLessonIds = newList.map((l) => l.id || (l as any)._id);
+
+    try {
+      await instructorLessonsService.reorder(sectionId, orderedLessonIds);
+      queryClient.invalidateQueries({ queryKey: ['instructor-section-lessons', sectionId] });
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Failed to reorder lessons.');
+    }
+  };
+
+  return (
+    <div className="mt-4 rounded-xl border border-black/10 bg-white p-4">
+      <div className="flex items-center justify-between border-b border-black/5 pb-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+          Lessons ({lessons.length})
+        </h4>
+        {!isCoursePublished ? (
+          <button
+            onClick={() => {
+              setLessonTitle('');
+              setErrorMsg(null);
+              setCreateModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1 rounded-lg border border-black/15 bg-white px-2.5 py-1 text-xs font-medium hover:bg-black/5"
+          >
+            <Plus size={13} /> Add Lesson
+          </button>
+        ) : null}
+      </div>
+
+      {lessons.length === 0 ? (
+        <p className="mt-3 text-xs text-ink-muted italic">No lessons in this section yet.</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {lessons.map((les, idx) => {
+            const lesId = les.id || (les as any)._id;
+            const isReadOnlyType = ['quiz', 'coding', 'assignment', 'mixed'].includes(les.lessonType || '');
+            const isLocked = les.isLocked || (les as any).status === 'locked';
+
+            return (
+              <div
+                key={lesId}
+                className="flex items-center justify-between rounded-lg border border-black/5 bg-canvas-cream/30 p-2.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-black/50">#{idx + 1}</span>
+                  {les.lessonType === 'video' ? <Video size={14} /> : <FileText size={14} />}
+                  <span className="text-xs font-medium">{les.title}</span>
+                  <span className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] uppercase font-semibold text-black/60">
+                    {les.lessonType}
+                  </span>
+                  {isLocked ? (
+                    <span className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
+                      <Lock size={10} /> Locked
+                    </span>
+                  ) : null}
+                  {isReadOnlyType ? (
+                    <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600">
+                      Read-Only
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  {!isCoursePublished ? (
+                    <>
+                      <button
+                        onClick={() => handleMoveLesson(idx, 'up')}
+                        disabled={idx === 0}
+                        title="Move Lesson Up"
+                        className="rounded p-1 hover:bg-black/10 disabled:opacity-20"
+                      >
+                        <ArrowUp size={13} />
+                      </button>
+                      <button
+                        onClick={() => handleMoveLesson(idx, 'down')}
+                        disabled={idx === lessons.length - 1}
+                        title="Move Lesson Down"
+                        className="rounded p-1 hover:bg-black/10 disabled:opacity-20"
+                      >
+                        <ArrowDown size={13} />
+                      </button>
+                    </>
+                  ) : null}
+
+                  <Link
+                    href={`/instructor/lessons/${lesId}/edit`}
+                    className="rounded p-1 hover:bg-black/10 text-ink"
+                    title="Edit Lesson"
+                  >
+                    <Edit2 size={13} />
+                  </Link>
+
+                  {!isCoursePublished && !isLocked && !isReadOnlyType ? (
+                    <button
+                      onClick={() => handleDeleteLesson(lesId)}
+                      title="Delete Lesson"
+                      className="rounded p-1 hover:bg-rose-100 text-rose-700"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create Lesson Modal */}
+      {createModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-base font-medium">Create New Lesson</h3>
+
+            {errorMsg ? (
+              <div className="mt-2 rounded-lg bg-rose-50 p-2.5 text-xs text-rose-800">
+                {errorMsg}
+              </div>
+            ) : null}
+
+            <form onSubmit={handleCreateLesson} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium uppercase text-ink-muted">Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={lessonTitle}
+                  onChange={(e) => setLessonTitle(e.target.value)}
+                  placeholder="e.g. Introduction to Variables"
+                  className="mt-1 w-full rounded-xl border border-black/15 px-3 py-2 text-xs outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium uppercase text-ink-muted">Lesson Type</label>
+                <select
+                  value={lessonType}
+                  onChange={(e) => setLessonType(e.target.value as any)}
+                  className="mt-1 w-full rounded-xl border border-black/15 px-3 py-2 text-xs outline-none"
+                >
+                  <option value="article">Article / Text</option>
+                  <option value="video">Video</option>
+                </select>
+                <p className="mt-1 text-[11px] text-ink-muted">
+                  Instructors can create Article or Video lessons. Quiz and Exercise types are Admin-managed.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCreateModalOpen(false)}
+                  className="rounded-xl border border-black/15 px-3 py-1.5 text-xs font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="rounded-xl bg-black px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-black/80 disabled:opacity-50"
+                >
+                  {creating ? 'Creating...' : 'Create Lesson'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export default function InstructorCourseEditorPage({ courseId }: { courseId: string }) {
   const queryClient = useQueryClient();
@@ -37,6 +288,7 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
   });
 
   const course = courseQuery.data?.course;
+  const isCoursePublished = course?.status === 'published';
 
   // Local course form state
   const [formData, setFormData] = useState<{
@@ -59,7 +311,6 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
     tagsInput: '',
   });
 
-  // Populate local form when query succeeds
   const [initialized, setInitialized] = useState(false);
   if (course && !initialized) {
     setFormData({
@@ -77,6 +328,8 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
 
   const handleUpdateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCoursePublished) return;
+
     setSavingCourse(true);
     setCourseError(null);
     setCourseSuccess(null);
@@ -108,7 +361,7 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
 
   const handleThumbnailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || isCoursePublished) return;
 
     setUploadingThumb(true);
     setCourseError(null);
@@ -143,10 +396,7 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
 
   const handleSaveSection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sectionTitle.trim()) {
-      setSectionError('Section title is required.');
-      return;
-    }
+    if (!sectionTitle.trim() || isCoursePublished) return;
 
     setSectionError(null);
 
@@ -172,7 +422,7 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
   };
 
   const handleDeleteSection = async (secId: string) => {
-    if (!confirm('Are you sure you want to delete this section?')) return;
+    if (!confirm('Are you sure you want to delete this section?') || isCoursePublished) return;
 
     try {
       await sectionsService.remove(secId);
@@ -185,7 +435,7 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
   const handleMoveSection = async (index: number, direction: 'up' | 'down') => {
     const list = sectionsQuery.data || [];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= list.length) return;
+    if (targetIndex < 0 || targetIndex >= list.length || isCoursePublished) return;
 
     const newList = [...list];
     const temp = newList[index];
@@ -275,9 +525,10 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
               <input
                 type="text"
                 required
+                disabled={isCoursePublished}
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-black"
+                className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-black disabled:opacity-50"
               />
             </div>
 
@@ -285,9 +536,10 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
               <label className="block text-xs font-medium uppercase tracking-wider text-ink-muted">Short Description</label>
               <input
                 type="text"
+                disabled={isCoursePublished}
                 value={formData.shortDescription}
                 onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-black"
+                className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-black disabled:opacity-50"
               />
             </div>
 
@@ -296,9 +548,10 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
               <textarea
                 required
                 rows={4}
+                disabled={isCoursePublished}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-black"
+                className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-black disabled:opacity-50"
               />
             </div>
 
@@ -306,9 +559,10 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wider text-ink-muted">Language</label>
                 <select
+                  disabled={isCoursePublished}
                   value={formData.language}
                   onChange={(e) => setFormData({ ...formData, language: e.target.value as any })}
-                  className="mt-1 w-full rounded-xl border border-black/15 bg-white px-3 py-2.5 text-sm outline-none"
+                  className="mt-1 w-full rounded-xl border border-black/15 bg-white px-3 py-2.5 text-sm outline-none disabled:opacity-50"
                 >
                   <option value="javascript">JavaScript</option>
                   <option value="java">Java</option>
@@ -319,9 +573,10 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wider text-ink-muted">Level</label>
                 <select
+                  disabled={isCoursePublished}
                   value={formData.level}
                   onChange={(e) => setFormData({ ...formData, level: e.target.value as any })}
-                  className="mt-1 w-full rounded-xl border border-black/15 bg-white px-3 py-2.5 text-sm outline-none"
+                  className="mt-1 w-full rounded-xl border border-black/15 bg-white px-3 py-2.5 text-sm outline-none disabled:opacity-50"
                 >
                   <option value="BEGINNER">Beginner</option>
                   <option value="INTERMEDIATE">Intermediate</option>
@@ -334,9 +589,10 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
                 <input
                   type="number"
                   min="0"
+                  disabled={isCoursePublished}
                   value={formData.estimatedDuration}
                   onChange={(e) => setFormData({ ...formData, estimatedDuration: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none"
+                  className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none disabled:opacity-50"
                 />
               </div>
             </div>
@@ -346,9 +602,10 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
                 <label className="block text-xs font-medium uppercase tracking-wider text-ink-muted">Category</label>
                 <input
                   type="text"
+                  disabled={isCoursePublished}
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none"
+                  className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none disabled:opacity-50"
                 />
               </div>
 
@@ -356,25 +613,26 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
                 <label className="block text-xs font-medium uppercase tracking-wider text-ink-muted">Tags (comma separated)</label>
                 <input
                   type="text"
+                  disabled={isCoursePublished}
                   value={formData.tagsInput}
                   onChange={(e) => setFormData({ ...formData, tagsInput: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none"
+                  className="mt-1 w-full rounded-xl border border-black/15 bg-white px-4 py-2.5 text-sm outline-none disabled:opacity-50"
                 />
               </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-4 border-t border-black/10 pt-5">
               <div>
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-black/15 bg-white px-4 py-2 text-xs font-medium hover:bg-black/5">
+                <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-black/15 bg-white px-4 py-2 text-xs font-medium hover:bg-black/5 ${isCoursePublished ? 'opacity-50 pointer-events-none' : ''}`}>
                   <Upload size={14} />
                   {uploadingThumb ? 'Uploading...' : 'Upload Thumbnail'}
-                  <input type="file" accept="image/*" onChange={handleThumbnailChange} disabled={uploadingThumb} className="hidden" />
+                  <input type="file" accept="image/*" onChange={handleThumbnailChange} disabled={uploadingThumb || isCoursePublished} className="hidden" />
                 </label>
               </div>
 
               <button
                 type="submit"
-                disabled={savingCourse}
+                disabled={savingCourse || isCoursePublished}
                 className="inline-flex items-center gap-2 rounded-xl bg-black px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-black/80 disabled:opacity-50"
               >
                 <Save size={15} />
@@ -384,19 +642,21 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
           </form>
         </section>
 
-        {/* Section Management */}
+        {/* Section & Lesson Management */}
         <section className="rounded-3xl border border-black/10 bg-white p-7 shadow-sm">
           <div className="flex items-center justify-between border-b border-black/5 pb-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-muted">Structure Authoring</p>
-              <h2 className="text-xl font-medium tracking-tight">Sections ({sections.length})</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-muted">Curriculum Authoring</p>
+              <h2 className="text-xl font-medium tracking-tight">Sections & Lessons ({sections.length})</h2>
             </div>
-            <button
-              onClick={openNewSectionModal}
-              className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-black/80"
-            >
-              <Plus size={15} /> Add Section
-            </button>
+            {!isCoursePublished ? (
+              <button
+                onClick={openNewSectionModal}
+                className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-black/80"
+              >
+                <Plus size={15} /> Add Section
+              </button>
+            ) : null}
           </div>
 
           {sections.length === 0 ? (
@@ -406,53 +666,60 @@ export default function InstructorCourseEditorPage({ courseId }: { courseId: str
               <p className="text-xs text-ink-muted">Add sections to structure your course curriculum.</p>
             </div>
           ) : (
-            <div className="mt-6 space-y-3">
+            <div className="mt-6 space-y-6">
               {sections.map((sec, idx) => {
                 const secId = sec.id || (sec as any)._id;
                 return (
-                  <div key={secId} className="flex items-center justify-between rounded-xl border border-black/10 bg-canvas-cream/50 p-4">
-                    <div>
+                  <div key={secId} className="rounded-2xl border border-black/10 bg-canvas-cream/40 p-5">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="rounded-md bg-black/10 px-2 py-0.5 text-xs font-bold text-black/60">
                           #{idx + 1}
                         </span>
-                        <h3 className="font-medium text-sm">{sec.title}</h3>
+                        <h3 className="font-medium text-base">{sec.title}</h3>
                       </div>
-                      {sec.description ? <p className="mt-1 text-xs text-ink-muted line-clamp-1">{sec.description}</p> : null}
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleMoveSection(idx, 'up')}
-                        disabled={idx === 0}
-                        title="Move Up"
-                        className="rounded-lg p-1.5 hover:bg-black/10 disabled:opacity-30"
-                      >
-                        <ArrowUp size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleMoveSection(idx, 'down')}
-                        disabled={idx === sections.length - 1}
-                        title="Move Down"
-                        className="rounded-lg p-1.5 hover:bg-black/10 disabled:opacity-30"
-                      >
-                        <ArrowDown size={14} />
-                      </button>
-                      <button
-                        onClick={() => openEditSectionModal(sec)}
-                        title="Edit Section"
-                        className="rounded-lg p-1.5 hover:bg-black/10 text-ink"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteSection(secId)}
-                        title="Delete Section"
-                        className="rounded-lg p-1.5 hover:bg-rose-100 text-rose-700"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {!isCoursePublished ? (
+                          <>
+                            <button
+                              onClick={() => handleMoveSection(idx, 'up')}
+                              disabled={idx === 0}
+                              title="Move Section Up"
+                              className="rounded-lg p-1.5 hover:bg-black/10 disabled:opacity-30"
+                            >
+                              <ArrowUp size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleMoveSection(idx, 'down')}
+                              disabled={idx === sections.length - 1}
+                              title="Move Section Down"
+                              className="rounded-lg p-1.5 hover:bg-black/10 disabled:opacity-30"
+                            >
+                              <ArrowDown size={14} />
+                            </button>
+                            <button
+                              onClick={() => openEditSectionModal(sec)}
+                              title="Edit Section"
+                              className="rounded-lg p-1.5 hover:bg-black/10 text-ink"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSection(secId)}
+                              title="Delete Section"
+                              className="rounded-lg p-1.5 hover:bg-rose-100 text-rose-700"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
                     </div>
+                    {sec.description ? <p className="mt-1 text-xs text-ink-muted">{sec.description}</p> : null}
+
+                    {/* Render Section Lessons list */}
+                    <SectionLessonsList sectionId={secId} isCoursePublished={Boolean(isCoursePublished)} />
                   </div>
                 );
               })}

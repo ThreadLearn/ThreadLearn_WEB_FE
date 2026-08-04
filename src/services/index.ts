@@ -212,6 +212,79 @@ export const lessonsService = {
   },
 };
 
+// ─── Instructor Lessons (Phase 5B) ───────────────────────────────────────────
+export const instructorLessonsService = {
+  listBySection: async (sectionId: string) => {
+    const { data } = await apiClient.get<ApiResponse<Lesson[]>>(
+      `/instructor/sections/${sectionId}/lessons`
+    );
+    return data.data;
+  },
+  getById: async (id: string) => {
+    const { data } = await apiClient.get<ApiResponse<Lesson>>(`/instructor/lessons/${id}`);
+    return data.data;
+  },
+  create: async (
+    sectionId: string,
+    payload: {
+      title: string;
+      description?: string;
+      contentMarkdown?: string;
+      lessonType: 'article' | 'video';
+      videoUrl?: string;
+      transcript?: string;
+      transcriptLanguage?: string;
+      subtitleTracks?: Array<{ language: string; label?: string; url: string }>;
+      codeSnippets?: Array<{ language: string; code: string; description?: string }>;
+      estimatedTime?: number;
+    }
+  ) => {
+    const { data } = await apiClient.post<ApiResponse<Lesson>>(
+      `/instructor/sections/${sectionId}/lessons`,
+      payload
+    );
+    return data.data;
+  },
+  update: async (
+    id: string,
+    payload: {
+      title?: string;
+      description?: string;
+      contentMarkdown?: string;
+      videoUrl?: string;
+      transcript?: string;
+      transcriptLanguage?: string;
+      subtitleTracks?: Array<{ language: string; label?: string; url: string }>;
+      codeSnippets?: Array<{ language: string; code: string; description?: string }>;
+      estimatedTime?: number;
+    }
+  ) => {
+    const { data } = await apiClient.put<ApiResponse<Lesson>>(`/instructor/lessons/${id}`, payload);
+    return data.data;
+  },
+  delete: async (id: string) => {
+    const { data } = await apiClient.delete<ApiResponse<{ id: string }>>(`/instructor/lessons/${id}`);
+    return data.data;
+  },
+  reorder: async (sectionId: string, orderedLessonIds: string[]) => {
+    const { data } = await apiClient.post<ApiResponse<{ sectionId: string; totalReordered: number }>>(
+      `/instructor/sections/${sectionId}/lessons/reorder`,
+      { orderedLessonIds }
+    );
+    return data.data;
+  },
+  uploadAttachment: async (lessonId: string, file: File) => {
+    const form = new FormData();
+    form.append('attachment', file);
+    const { data } = await apiClient.post<ApiResponse<Lesson>>(
+      `/instructor/lessons/${lessonId}/attachment`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return data.data;
+  },
+};
+
 // ——— Course sections (UC54) ————————————————————————————————————————————
 export const sectionsService = {
   listByCourse: async (courseId: string) => {
